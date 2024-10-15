@@ -1,0 +1,6 @@
+appName: coaudit-db
+appImage: postgres
+appVersion: 14
+appReplicas: 1
+containerPort: 5432
+

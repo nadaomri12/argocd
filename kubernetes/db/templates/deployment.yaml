@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.appName }}
+  labels:
+    app: {{ .Values.appName }}
+spec:
+  replicas: {{ .Values.appReplicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.appName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.appName }}
+    spec:
+      containers:
+      - name: {{ .Values.appName }}
+        image: "{{ .Values.appImage }}:{{ .Values.appVersion }}"
+        ports:
+        - containerPort: {{ .Values.containerPort }}
+
+        env:
+          - name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretName }}
+                key: POSTGRES_PASSWORD
+          - name: POSTGRES_DB
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretName }}
+                key: POSTGRES_DB
+          - name: PGDATA
+            value: /var/lib/postgresql/data/pgdata  # Utilisation d'un sous-répertoire pour les données de la base de données
+
+        volumeMounts:
+          - name: postgres-persistent-storage
+            mountPath: /var/lib/postgresql/data
+
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres"]
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres"]
+          initialDelaySeconds: 15
+          periodSeconds: 20
+
+      volumes:
+      - name: postgres-persistent-storage
+        persistentVolumeClaim:
+          claimName: postgres-pv-claim
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pv-claim  # Nom de la PVC, essentiel pour identifier le volume de stockage
+  labels:
+    app: {{ .Values.appName }}
+    tier: database
+spec:
+  accessModes:
+    - ReadWriteOnce  # Mode d'accès de la PVC (lecture/écriture par un seul nœud à la fois)
+  resources:
+    requests:
+      storage: 1Gi  # Quantité d'espace de stockage demandée
